@@ -112,6 +112,23 @@ class BackgroundWorker(
 
     private fun stopEngine(result: Result?) {
         val fetchDuration = System.currentTimeMillis() - startTime
+        if (result == Result.failure() || result == null) {
+            //invoke method to stop
+            Handler(Looper.getMainLooper()).post {
+                backgroundChannel.invokeMethod("cancelledWork",
+                    mapOf(DART_TASK_KEY to dartTask, PAYLOAD_KEY to payload),
+                    object : MethodChannel.Result {
+                        override fun notImplemented() {
+                        }
+
+                        override fun error(p0: String?, p1: String?, p2: Any?) {
+                        }
+
+                        override fun success(receivedResult: Any?) {
+                        }
+                    })
+            }
+        }
 
         if (isInDebug) {
             DebugHelper.postTaskCompleteNotification(
@@ -131,10 +148,10 @@ class BackgroundWorker(
         }
 
         // If stopEngine is called from `onStopped`, it may not be from the main thread.
-        Handler(Looper.getMainLooper()).post {
+        Handler(Looper.getMainLooper()).postDelayed({
             engine?.destroy()
             engine = null
-        }
+        }, 5000)
     }
 
     override fun onMethodCall(call: MethodCall, r: MethodChannel.Result) {

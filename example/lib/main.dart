@@ -17,12 +17,18 @@ const simplePeriodicTask = "simplePeriodicTask";
 const simplePeriodic1HourTask = "simplePeriodic1HourTask";
 
 void callbackDispatcher() {
+  Workmanager().setOnTaskStoppedListener((task, inputData) async {
+    print("task stop started");
+    await Future.delayed(Duration(seconds: 2));
+    print('task stopped with inputdata $inputData');
+  });
   Workmanager().executeTask((task, inputData) async {
     switch (task) {
       case simpleTaskKey:
         print("$simpleTaskKey was executed. inputData = $inputData");
         final prefs = await SharedPreferences.getInstance();
         prefs.setBool("test", true);
+        await Future.delayed(Duration(seconds: 4));
         print("Bool from prefs: ${prefs.getBool("test")}");
         break;
       case rescheduledTaskKey:
@@ -127,6 +133,8 @@ class _MyAppState extends State<MyApp> {
                   Workmanager().registerOneOffTask(
                     "1",
                     simpleTaskKey,
+                    constraints:
+                        Constraints(networkType: NetworkType.connected),
                     inputData: <String, dynamic>{
                       'int': 1,
                       'bool': true,

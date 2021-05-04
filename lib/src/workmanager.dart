@@ -119,6 +119,15 @@ class Workmanager {
   void executeTask(final BackgroundTaskHandler backgroundTask) {
     WidgetsFlutterBinding.ensureInitialized();
     _backgroundChannel.setMethodCallHandler((call) async {
+      if (call.method == "cancelledWork") {
+        final inputData =
+            call.arguments["be.tramckrijte.workmanager.INPUT_DATA"];
+        await _onTaskStopped!(
+          call.arguments["be.tramckrijte.workmanager.DART_TASK"],
+          inputData == null ? null : jsonDecode(inputData),
+        );
+        return true;
+      }
       final inputData = call.arguments["be.tramckrijte.workmanager.INPUT_DATA"];
       return backgroundTask(
         call.arguments["be.tramckrijte.workmanager.DART_TASK"],
@@ -126,6 +135,12 @@ class Workmanager {
       );
     });
     _backgroundChannel.invokeMethod("backgroundChannelInitialized");
+  }
+
+  Function? _onTaskStopped;
+
+  setOnTaskStoppedListener(Function callback) {
+    _onTaskStopped = callback;
   }
 
   /// This call is required if you wish to use the [WorkManager] plugin.
