@@ -3,6 +3,12 @@ import Flutter
 import UIKit
 import os
 
+extension String {
+    var lowercasingFirst: String {
+        return prefix(1).lowercased() + dropFirst()
+    }
+}
+
 public class SwiftWorkmanagerPlugin: FlutterPluginAppLifeCycleDelegate {
 
     static let identifier = "be.tramckrijte.workmanager"
@@ -16,18 +22,30 @@ public class SwiftWorkmanagerPlugin: FlutterPluginAppLifeCycleDelegate {
 
         struct Methods {
             struct Initialize {
-                static let name = "\(Initialize.self)"
+                static let name = "\(Initialize.self)".lowercasingFirst
                 enum Arguments: String {
                     case isInDebugMode
                     case callbackHandle
                 }
             }
             struct RegisterOneOffTask {
-                static let name = "\(RegisterOneOffTask.self)"
+                static let name = "\(RegisterOneOffTask.self)".lowercasingFirst
                 enum Arguments: String {
                     case initialDelaySeconds
                     case networkType
                     case requiresCharging
+                }
+            }
+            struct CancelAllTasks {
+                static let name = "\(CancelAllTasks.self)".lowercasingFirst
+                enum Arguments: String {
+                    case none
+                }
+            }
+            struct CancelTaskByUniqueName {
+                static let name = "\(CancelTaskByUniqueName.self)".lowercasingFirst
+                enum Arguments: String {
+                    case uniqueName
                 }
             }
         }
@@ -144,8 +162,8 @@ extension SwiftWorkmanagerPlugin: FlutterPlugin {
                 let requiresCharging = arguments[method.Arguments.requiresCharging.rawValue] as? Bool ?? false
 
                 var requiresNetworkConnectivity = false
-                if let networkTypeInput = arguments[method.Arguments.initialDelaySeconds.rawValue] as? String,
-                   let networkType = NetworkType(rawValue: networkTypeInput),
+                if let networkTypeInput = arguments[method.Arguments.networkType.rawValue] as? String,
+                   let networkType = NetworkType(fromDart: networkTypeInput),
                    networkType == .connected || networkType == .metered {
                     requiresNetworkConnectivity = true
                 }
@@ -165,6 +183,24 @@ extension SwiftWorkmanagerPlugin: FlutterPlugin {
             } else {
                 result(WMPError.unhandledMethod(call.method).asFlutterError)
             }
+
+        case (ForegroundMethodChannel.Methods.CancelAllTasks.name, let .none):
+            if #available(iOS 13.0, *) {
+                BGTaskScheduler.shared.cancelAllTaskRequests()
+            }
+            result(true)
+
+        case (ForegroundMethodChannel.Methods.CancelTaskByUniqueName.name, let .some(arguments)):
+            if #available(iOS 13.0, *) {
+                let method = ForegroundMethodChannel.Methods.CancelTaskByUniqueName.self
+                guard let identifier = arguments[method.Arguments.uniqueName.rawValue] as? String else {
+                    result(WMPError.invalidParameters.asFlutterError)
+                    return
+                }
+                BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
+            }
+            result(true)
+
         default:
             result(WMPError.unhandledMethod(call.method).asFlutterError)
             return

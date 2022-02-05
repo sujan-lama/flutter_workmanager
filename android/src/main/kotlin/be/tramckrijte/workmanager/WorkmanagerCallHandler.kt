@@ -6,6 +6,7 @@ import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequest
 import androidx.work.WorkManager
 import be.tramckrijte.workmanager.BackgroundWorker.Companion.DART_TASK_KEY
@@ -25,13 +26,22 @@ private interface CallHandler<T : WorkManagerCall> {
 class WorkmanagerCallHandler(private val ctx: Context) : MethodChannel.MethodCallHandler {
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (val extractedCall = Extractor.extractWorkManagerCallFromRawMethodName(call)) {
-            is WorkManagerCall.Initialize -> InitializeHandler.handle(ctx, extractedCall, result)
+            is WorkManagerCall.Initialize -> InitializeHandler.handle(
+                ctx,
+                extractedCall,
+                result
+            )
             is WorkManagerCall.RegisterTask -> RegisterTaskHandler.handle(
                 ctx,
                 extractedCall,
                 result
             )
             is WorkManagerCall.CancelTask -> UnregisterTaskHandler.handle(
+                ctx,
+                extractedCall,
+                result
+            )
+            is WorkManagerCall.Failed -> FailedTaskHandler(extractedCall.code).handle(
                 ctx,
                 extractedCall,
                 result
@@ -104,6 +114,7 @@ private object RegisterTaskHandler : CallHandler<WorkManagerCall.RegisterTask> {
             initialDelaySeconds = convertedCall.initialDelaySeconds,
             constraintsConfig = convertedCall.constraintsConfig,
             backoffPolicyConfig = convertedCall.backoffPolicyConfig,
+            outOfQuotaPolicy = convertedCall.outOfQuotaPolicy,
             payload = convertedCall.payload
         )
     }
@@ -122,6 +133,7 @@ private object RegisterTaskHandler : CallHandler<WorkManagerCall.RegisterTask> {
             initialDelaySeconds = convertedCall.initialDelaySeconds,
             constraintsConfig = convertedCall.constraintsConfig,
             backoffPolicyConfig = convertedCall.backoffPolicyConfig,
+            outOfQuotaPolicy = convertedCall.outOfQuotaPolicy,
             payload = convertedCall.payload
         )
     }
@@ -142,6 +154,16 @@ private object UnregisterTaskHandler : CallHandler<WorkManagerCall.CancelTask> {
             WorkManagerCall.CancelTask.All -> WM.cancelAll(context)
         }
         result.success()
+    }
+}
+
+class FailedTaskHandler(private val code: String) : CallHandler<WorkManagerCall.Failed> {
+    override fun handle(
+        context: Context,
+        convertedCall: WorkManagerCall.Failed,
+        result: MethodChannel.Result
+    ) {
+        result.error(code, null, null)
     }
 }
 
@@ -166,6 +188,7 @@ object WM {
         existingWorkPolicy: ExistingWorkPolicy = defaultOneOffExistingWorkPolicy,
         initialDelaySeconds: Long = defaultInitialDelaySeconds,
         constraintsConfig: Constraints = defaultConstraints,
+        outOfQuotaPolicy: OutOfQuotaPolicy? = defaultOutOfQuotaPolicy,
         backoffPolicyConfig: BackoffPolicyTaskConfig?
     ) {
         val oneOffTaskRequest = OneTimeWorkRequest.Builder(BackgroundWorker::class.java)
@@ -181,7 +204,10 @@ object WM {
                     )
                 }
             }
-            .apply { tag?.let(::addTag) }
+            .apply {
+                tag?.let(::addTag)
+                outOfQuotaPolicy?.let(::setExpedited)
+            }
             .build()
         context.workManager()
             .enqueueUniqueWork(uniqueName, existingWorkPolicy, oneOffTaskRequest)
@@ -198,6 +224,7 @@ object WM {
         existingWorkPolicy: ExistingPeriodicWorkPolicy = defaultPeriodExistingWorkPolicy,
         initialDelaySeconds: Long = defaultInitialDelaySeconds,
         constraintsConfig: Constraints = defaultConstraints,
+        outOfQuotaPolicy: OutOfQuotaPolicy? = defaultOutOfQuotaPolicy,
         backoffPolicyConfig: BackoffPolicyTaskConfig?
     ) {
         val periodicTaskRequest =
@@ -218,7 +245,10 @@ object WM {
                         )
                     }
                 }
-                .apply { tag?.let(::addTag) }
+                .apply {
+                    tag?.let(::addTag)
+                    outOfQuotaPolicy?.let(::setExpedited)
+                }
                 .build()
         context.workManager()
             .enqueueUniquePeriodicWork(uniqueName, existingWorkPolicy, periodicTaskRequest)

@@ -1,3 +1,23 @@
+# 0.5.0-dev.8
+
+* iOS: Add implementations for cancelCall and cancelByUniqueName
+* Android: Bump to workmanager 2.7.1 to support Android 12
+* Android: Add support for expedited background work (a `OutOfQuotaPolicy` needs to be specified)
+
+# 0.5.0-dev.7
+
+* Android: Use `Number` type for specifying the callback handler key & convert to Long
+* Android: Bump WorkManager dependency to 2.6.0
+* iOS: Restore correct NetworkType parser which did not set `requiresNetworkConnectivity` correctly.
+
+# 0.5.0-dev.6
+
+* Resolves issues on iOS which prevented native calls from being parsed correctly.
+
+# 0.5.0-dev.5
+
+* Resolve a null pointer error in BackgroundWorker
+
 # 0.5.0-dev.4
 
 * Replace _noDuration variable with `Duration.zero` directly (#283)
